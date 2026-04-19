@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NATA Exam Timer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       CSS CUSTOM PROPERTIES & THEME
+    ============================================================ */
+    :root {
+      --font-display: 'Syne', sans-serif;
+      --font-mono:    'DM Mono', monospace;
+      --radius:       16px;
+      --transition:   0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+      --blue-500:   #3b82f6;
+      --blue-400:   #60a5fa;
+      --orange-500: #f97316;
+      --orange-400: #fb923c;
+      --red-500:    #ef4444;
+      --green-500:  #22c55e;
+
+      /* Light theme */
+      --bg:             #f8fafc;
+      --bg-card:        #ffffff;
+      --text-primary:   #0f172a;
+      --text-secondary: #64748b;
+      --border:         #e2e8f0;
+      --shadow-lg:      0 12px 48px rgba(0,0,0,0.10);
+    }
+
+    [data-theme="dark"] {
+      --bg:             #0b0f1a;
+      --bg-card:        #141824;
+      --text-primary:   #f1f5f9;
+      --text-secondary: #94a3b8;
+      --border:         #1e293b;
+      --shadow-lg:      0 12px 48px rgba(0,0,0,0.5);
+    }
+
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-display);
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      transition: background var(--transition), color var(--transition);
+      overflow-x: hidden;
+    }
+
+    /* ============================================================
+       BACKGROUND BLOBS
+    ============================================================ */
+    .bg-blob {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .bg-blob::before,
+    .bg-blob::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.15;
+      transition: background var(--transition);
+    }
+    .bg-blob::before {
+      width: 600px; height: 600px;
+      top: -200px; left: -200px;
+      background: var(--phase-accent, #3b82f6);
+      animation: drift1 18s ease-in-out infinite alternate;
+    }
+    .bg-blob::after {
+      width: 500px; height: 500px;
+      bottom: -200px; right: -100px;
+      background: var(--phase-accent, #3b82f6);
+      animation: drift2 22s ease-in-out infinite alternate;
+    }
+    @keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(60px,40px) scale(1.1); } }
+    @keyframes drift2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-40px,-60px) scale(1.15); } }
+
+    /* ============================================================
+       LAYOUT
+    ============================================================ */
+    .app-wrapper {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+
+    /* ============================================================
+       TOP BAR
+    ============================================================ */
+    .top-bar {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .top-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Phase switch pill button */
+    .phase-switch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 16px;
+      border-radius: 100px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .phase-switch-btn:hover {
+      border-color: var(--phase-accent, #3b82f6);
+      color: var(--phase-accent, #3b82f6);
+      background: var(--phase-bg, #dbeafe);
+    }
+    .phase-switch-arrow {
+      font-size: 0.85rem;
+      transition: transform 0.2s;
+    }
+    .phase-switch-btn:hover .phase-switch-arrow {
+      transform: translateX(3px);
+    }
+
+    .icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.95rem;
+    }
+    .icon-btn:hover {
+      border-color: var(--phase-accent, #3b82f6);
+      color: var(--phase-accent, #3b82f6);
+      transform: scale(1.08);
+    }
+
+    /* ============================================================
+       MAIN CARD
+    ============================================================ */
+    .card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border);
+      border-radius: 24px;
+      padding: 40px 32px;
+      box-shadow: var(--shadow-lg);
+      transition: all var(--transition);
+    }
+
+    /* Phase label badge */
+    .phase-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--phase-accent, #3b82f6);
+      background: var(--phase-bg, #dbeafe);
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 18px;
+      transition: all var(--transition);
+    }
+    .phase-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .phase-title {
+      font-size: clamp(1.35rem, 4vw, 1.85rem);
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      line-height: 1.15;
+    }
+    .phase-subtitle {
+      font-size: 0.83rem;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+
+    /* ============================================================
+       RING + TIMER DISPLAY
+    ============================================================ */
+    .timer-visual {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .ring-container {
+      position: relative;
+      width: clamp(210px, 48vw, 290px);
+      height: clamp(210px, 48vw, 290px);
+    }
+    .ring-svg {
+      width: 100%; height: 100%;
+      transform: rotate(-90deg);
+    }
+    .ring-track {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 10;
+    }
+    .ring-progress {
+      fill: none;
+      stroke: var(--phase-accent, #3b82f6);
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1),
+                  stroke var(--transition);
+      filter: drop-shadow(0 0 8px var(--phase-accent, #3b82f6));
+    }
+
+    .ring-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .timer-display {
+      font-family: var(--font-mono);
+      font-size: clamp(2.6rem, 9vw, 4rem);
+      font-weight: 500;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .timer-display.urgent {
+      color: var(--red-500);
+      animation: shake 0.4s ease-in-out;
+    }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%      { transform: translateX(-4px); }
+      75%      { transform: translateX(4px); }
+    }
+    .timer-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    /* ============================================================
+       PHASE 2 STATS
+    ============================================================ */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      max-width: 460px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .stat-box {
+      flex: 1;
+      min-width: 90px;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      text-align: center;
+    }
+    /* Question counter stat box — slightly highlighted */
+    .stat-box.question-box {
+      border-color: var(--phase-accent, #3b82f6);
+      background: var(--phase-bg, #dbeafe);
+    }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 1.35rem;
+      font-weight: 500;
+      color: var(--phase-accent, #3b82f6);
+    }
+    .stat-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* ============================================================
+       PROGRESS BAR
+    ============================================================ */
+    .progress-section {
+      width: 100%;
+      margin-bottom: 32px;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.73rem;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background: var(--bg);
+      border-radius: 100px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 100px;
+      background: linear-gradient(90deg, var(--phase-accent, #3b82f6), var(--phase-accent2, #60a5fa));
+      transition: width 0.9s cubic-bezier(0.4,0,0.2,1);
+      box-shadow: 0 0 8px var(--phase-accent, #3b82f6);
+    }
+
+    /* ============================================================
+       BUTTONS
+    ============================================================ */
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 12px 24px;
+      border-radius: 100px;
+      font-family: var(--font-display);
+      font-size: 0.86rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--phase-accent, #3b82f6);
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(59,130,246,0.3);
+    }
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(59,130,246,0.45);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover:not(:disabled) {
+      border-color: var(--phase-accent, #3b82f6);
+      color: var(--phase-accent, #3b82f6);
+    }
+
+    /* "Next" button — green accent so it stands out */
+    .btn-next {
+      background: transparent;
+      color: var(--green-500);
+      border-color: rgba(34,197,94,0.4);
+    }
+    .btn-next:hover:not(:disabled) {
+      background: rgba(34,197,94,0.08);
+      border-color: var(--green-500);
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--red-500);
+      border-color: rgba(239,68,68,0.3);
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239,68,68,0.08);
+      border-color: var(--red-500);
+    }
+
+    /* ============================================================
+       DIVIDER
+    ============================================================ */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: var(--border);
+      margin: 28px 0;
+    }
+
+    .restart-row {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ============================================================
+       COMPLETION OVERLAY
+    ============================================================ */
+    .completion-overlay {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 14px;
+      padding: 16px 0;
+    }
+    .completion-overlay.visible { display: flex; }
+    .completion-icon {
+      font-size: 3.2rem;
+      animation: pop-in 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes pop-in {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+    .completion-title { font-size: 1.8rem; font-weight: 800; }
+    .completion-sub   { font-size: 0.88rem; color: var(--text-secondary); max-width: 320px; }
+
+    /* ============================================================
+       PHASE TRANSITION ANIMATION
+    ============================================================ */
+    .card.phase-transition {
+      animation: phase-switch 0.45s cubic-bezier(0.4,0,0.2,1);
+    }
+    @keyframes phase-switch {
+      0%   { opacity: 0; transform: translateY(14px) scale(0.98); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ============================================================
+       PHASE THEME TOKENS
+    ============================================================ */
+    .phase-1 {
+      --phase-accent:  #3b82f6;
+      --phase-accent2: #60a5fa;
+      --phase-bg:      #dbeafe;
+    }
+    [data-theme="dark"] .phase-1 { --phase-bg: rgba(59,130,246,0.13); }
+
+    .phase-2 {
+      --phase-accent:  #f97316;
+      --phase-accent2: #fb923c;
+      --phase-bg:      #ffedd5;
+    }
+    [data-theme="dark"] .phase-2 { --phase-bg: rgba(249,115,22,0.13); }
+
+    /* ============================================================
+       FOOTER & UTILITIES
+    ============================================================ */
+    .footer-note {
+      margin-top: 22px;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-align: center;
+      opacity: 0.65;
+    }
+    .hidden { display: none !important; }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media (max-width: 520px) {
+      .card    { padding: 26px 18px; }
+      .btn     { padding: 10px 18px; font-size: 0.8rem; }
+      .top-bar { gap: 8px; }
+      .phase-switch-btn { padding: 7px 12px; font-size: 0.7rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-blob"></div>
+
+<div class="app-wrapper">
+
+  <!-- ── TOP BAR ── -->
+  <div class="top-bar">
+    <span class="brand">NATA · Exam Timer</span>
+    <div class="top-right">
+
+      <!-- Phase switch button -->
+      <button class="phase-switch-btn" id="phaseSwitchBtn" title="Switch phase">
+        <span id="phaseSwitchLabel">Switch to Part B</span>
+        <span class="phase-switch-arrow">→</span>
+      </button>
+
+      <!-- Sound toggle -->
+      <button class="icon-btn" id="soundToggle" title="Toggle Sound" aria-label="Toggle Sound">🔔</button>
+      <!-- Dark mode toggle -->
+      <button class="icon-btn" id="themeToggle" title="Toggle Dark Mode" aria-label="Toggle Theme">🌙</button>
+    </div>
+  </div>
+
+  <!-- ── MAIN CARD ── -->
+  <div class="card phase-1" id="mainCard">
+
+    <!-- Phase badge -->
+    <div class="phase-label" id="phaseLabel">
+      <span class="phase-dot"></span>
+      <span id="phaseLabelText">Part A · Drawing</span>
+    </div>
+
+    <div class="phase-title" id="phaseTitle">Drawing Test</div>
+    <div class="phase-subtitle" id="phaseSubtitle">90 minutes · Focus and sketch your best work</div>
+
+    <!-- ── TIMER RING ── -->
+    <div class="timer-visual" id="timerVisual">
+      <div class="ring-container">
+        <svg class="ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track"    cx="60" cy="60" r="50" />
+          <circle class="ring-progress" cx="60" cy="60" r="50"
+                  id="ringProgress"
+                  stroke-dasharray="314.16"
+                  stroke-dashoffset="314.16" />
+        </svg>
+        <div class="ring-text">
+          <div class="timer-display" id="timerDisplay">90:00</div>
+          <div class="timer-label"  id="timerLabelInner">remaining</div>
+        </div>
+      </div>
+
+      <!-- Phase 2 stats — hidden in Phase 1 -->
+      <div class="stats-row hidden" id="statsRow">
+        <div class="stat-box question-box">
+          <div class="stat-value" id="statQuestion">Q 1</div>
+          <div class="stat-label">Question</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="statElapsed">00:00</div>
+          <div class="stat-label">Elapsed</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="statCycles">0</div>
+          <div class="stat-label">Done</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="statTotal">90:00</div>
+          <div class="stat-label">Total Left</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PROGRESS BAR ── -->
+    <div class="progress-section">
+      <div class="progress-header">
+        <span id="progressLabel">Phase 1 Progress</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- ── CONTROL BUTTONS ── -->
+    <div id="controlBtns">
+
+      <!-- Main controls row -->
+      <div class="btn-row" style="margin-bottom: 12px;">
+        <button class="btn btn-primary" id="startPauseBtn">▶ Start</button>
+        <button class="btn btn-ghost"   id="resetBtn">↺ Reset</button>
+        <!-- Phase 1: skip to Part B early -->
+        <button class="btn btn-next" id="nextPhase1Btn" title="Finished early? Jump to Part B">
+          ✓ Done Early — Go to Part B →
+        </button>
+        <!-- Phase 2: skip current cycle -->
+        <button class="btn btn-next hidden" id="nextCycleBtn" title="Next question, reset 108s">
+          Next Question →
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ── COMPLETION OVERLAY ── -->
+    <div class="completion-overlay" id="completionOverlay">
+      <div class="completion-icon">🎉</div>
+      <div class="completion-title" id="completionTitle">Exam Complete!</div>
+      <div class="completion-sub"  id="completionSub">
+        Great job! You've completed all parts of the NATA practice exam.
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="restart-row">
+      <button class="btn btn-danger" id="restartBtn">⟳ Restart Full Exam</button>
+    </div>
+
+  </div><!-- /card -->
+
+  <div class="footer-note">Progress is saved — closing the tab won't reset your timer.</div>
+
+</div><!-- /app-wrapper -->
+
+
+<!-- ============================================================
+     JAVASCRIPT
+============================================================ -->
+<script>
+/* ============================================================
+   CONSTANTS
+============================================================ */
+const PHASE1_DURATION  = 90 * 60;   // 5400 seconds
+const PHASE2_DURATION  = 90 * 60;   // 5400 seconds
+const CYCLE_DURATION   = 108;       // 1 min 48 sec per MCQ cycle
+const CIRCUMFERENCE    = 314.16;    // 2π × r(50)
+const SAVE_KEY         = 'nata_timer_v2';
+const URGENT_THRESHOLD = 120;       // Phase 1: last 2 min → red
+const CYCLE_URGENT     = 20;        // Phase 2 cycle: last 20 sec → red
+
+/* ============================================================
+   STATE
+============================================================ */
+let state = {
+  phase:       1,       // 1 or 2
+  running:     false,
+  soundOn:     true,
+  darkMode:    false,
+  startEpoch:  null,    // Date.now() when last resumed (phase timer)
+  accSeconds:  0,       // seconds accumulated in phase before current run
+  cycles:      0,       // Phase 2: completed cycles (= questions answered)
+  cycleEpoch:  null,    // Date.now() when current cycle last started/resumed
+  cycleAcc:    0,       // seconds already used in current cycle before resume
+  done:        false,
+};
+
+let rafId    = null;
+let audioCtx = null;
+
+/* ============================================================
+   DOM REFS
+============================================================ */
+const $card           = document.getElementById('mainCard');
+const $phaseLabelTxt  = document.getElementById('phaseLabelText');
+const $phaseTitle     = document.getElementById('phaseTitle');
+const $phaseSub       = document.getElementById('phaseSubtitle');
+const $timerDisplay   = document.getElementById('timerDisplay');
+const $timerLblInner  = document.getElementById('timerLabelInner');
+const $ringProgress   = document.getElementById('ringProgress');
+const $statsRow       = document.getElementById('statsRow');
+const $statQuestion   = document.getElementById('statQuestion');
+const $statElapsed    = document.getElementById('statElapsed');
+const $statCycles     = document.getElementById('statCycles');
+const $statTotal      = document.getElementById('statTotal');
+const $progressFill   = document.getElementById('progressFill');
+const $progressPct    = document.getElementById('progressPct');
+const $progressLabel  = document.getElementById('progressLabel');
+const $startPauseBtn  = document.getElementById('startPauseBtn');
+const $resetBtn       = document.getElementById('resetBtn');
+const $restartBtn     = document.getElementById('restartBtn');
+const $nextPhase1Btn  = document.getElementById('nextPhase1Btn');
+const $nextCycleBtn   = document.getElementById('nextCycleBtn');
+const $phaseSwitchBtn = document.getElementById('phaseSwitchBtn');
+const $phaseSwitchLbl = document.getElementById('phaseSwitchLabel');
+const $soundToggle    = document.getElementById('soundToggle');
+const $themeToggle    = document.getElementById('themeToggle');
+const $completion     = document.getElementById('completionOverlay');
+const $controlBtns    = document.getElementById('controlBtns');
+
+/* ============================================================
+   WEB AUDIO
+============================================================ */
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function playTone(freq, duration, type = 'sine', delay = 0) {
+  if (!state.soundOn) return;
+  try {
+    ensureAudio();
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type            = type;
+    osc.frequency.value = freq;
+    const t = audioCtx.currentTime + delay;
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  } catch(e) {}
+}
+
+/** Short double-beep: end of cycle */
+function playBeep() {
+  playTone(1046, 0.15, 'sine', 0);
+  playTone(1318, 0.15, 'sine', 0.2);
+}
+
+/** Triple rising alert: end of phase or exam */
+function playAlert() {
+  playTone(880,  0.2,  'sine', 0);
+  playTone(1108, 0.2,  'sine', 0.28);
+  playTone(1318, 0.35, 'sine', 0.56);
+}
+
+/** Soft click: Next button pressed */
+function playClick() {
+  playTone(880, 0.06, 'sine', 0);
+}
+
+/* ============================================================
+   HELPERS
+============================================================ */
+/** Seconds → "MM:SS" */
+function fmt(sec) {
+  sec = Math.max(0, Math.round(sec));
+  return `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+}
+
+/** Set SVG ring fill [0..1] */
+function setRing(fraction) {
+  fraction = Math.max(0, Math.min(1, fraction));
+  $ringProgress.style.strokeDashoffset = (CIRCUMFERENCE * (1 - fraction)).toFixed(2);
+}
+
+/* ============================================================
+   PHASE THEME — apply CSS classes & labels
+============================================================ */
+function applyPhaseTheme() {
+  if (state.phase === 1) {
+    $card.classList.remove('phase-2');
+    $card.classList.add('phase-1');
+    $phaseLabelTxt.textContent  = 'Part A · Drawing';
+    $phaseTitle.textContent     = 'Drawing Test';
+    $phaseSub.textContent       = '90 minutes · Focus and sketch your best work';
+    $timerLblInner.textContent  = 'remaining';
+    $progressLabel.textContent  = 'Phase 1 Progress';
+    $statsRow.classList.add('hidden');
+    $nextPhase1Btn.classList.remove('hidden');
+    $nextCycleBtn.classList.add('hidden');
+    $phaseSwitchLbl.textContent = 'Switch to Part B';
+  } else {
+    $card.classList.remove('phase-1');
+    $card.classList.add('phase-2');
+    $phaseLabelTxt.textContent  = 'Part B · MCQ Speed';
+    $phaseTitle.textContent     = 'MCQ Speed Practice';
+    $phaseSub.textContent       = '90 min total · 108-second cycles · Stay sharp';
+    $timerLblInner.textContent  = 'this cycle';
+    $progressLabel.textContent  = 'Overall Phase 2 Progress';
+    $statsRow.classList.remove('hidden');
+    $nextPhase1Btn.classList.add('hidden');
+    $nextCycleBtn.classList.remove('hidden');
+    $phaseSwitchLbl.textContent = 'Switch to Part A';
+  }
+}
+
+/* ============================================================
+   ELAPSED TIME HELPERS  (drift-safe via Date.now())
+============================================================ */
+function phaseElapsed() {
+  let e = state.accSeconds;
+  if (state.running && state.startEpoch !== null) {
+    e += (Date.now() - state.startEpoch) / 1000;
+  }
+  return e;
+}
+
+function cycleElapsed() {
+  let e = state.cycleAcc;
+  if (state.running && state.cycleEpoch !== null) {
+    e += (Date.now() - state.cycleEpoch) / 1000;
+  }
+  return e;
+}
+
+/* ============================================================
+   UI UPDATE — called every RAF frame
+============================================================ */
+function updateUI() {
+  if (state.done) return;
+  state.phase === 1 ? updatePhase1() : updatePhase2();
+}
+
+function updatePhase1() {
+  const elapsed   = phaseElapsed();
+  const remaining = PHASE1_DURATION - elapsed;
+
+  if (remaining <= 0) { finishPhase1(); return; }
+
+  $timerDisplay.textContent = fmt(remaining);
+  $timerDisplay.classList.toggle('urgent', remaining < URGENT_THRESHOLD);
+  setRing(elapsed / PHASE1_DURATION);
+
+  const pct = Math.min(100, (elapsed / PHASE1_DURATION) * 100);
+  $progressFill.style.width = pct + '%';
+  $progressPct.textContent  = Math.round(pct) + '%';
+}
+
+function updatePhase2() {
+  const totalElapsed   = phaseElapsed();
+  const totalRemaining = PHASE2_DURATION - totalElapsed;
+
+  if (totalRemaining <= 0) { finishPhase2(); return; }
+
+  const cElapsed   = cycleElapsed();
+  const cRemaining = CYCLE_DURATION - cElapsed;
+
+  // Cycle ended naturally → auto-advance
+  if (cRemaining <= 0) {
+    advanceCycle(false); // false = natural end (plays beep)
+    return;
+  }
+
+  // Ring shows current cycle progress
+  setRing(cElapsed / CYCLE_DURATION);
+  $timerDisplay.textContent = fmt(cRemaining);
+  $timerDisplay.classList.toggle('urgent', cRemaining < CYCLE_URGENT);
+
+  // Stats
+  const questionNum = state.cycles + 1; // current question being attempted
+  $statQuestion.textContent = `Q ${questionNum}`;
+  $statElapsed.textContent  = fmt(totalElapsed);
+  $statCycles.textContent   = state.cycles;
+  $statTotal.textContent    = fmt(totalRemaining);
+
+  // Overall progress bar
+  const pct = Math.min(100, (totalElapsed / PHASE2_DURATION) * 100);
+  $progressFill.style.width = pct + '%';
+  $progressPct.textContent  = Math.round(pct) + '%';
+}
+
+/* ============================================================
+   ADVANCE CYCLE — used by both natural end & "Next" button
+   manual: true  → user pressed Next (plays click)
+   manual: false → natural 108s end (plays beep)
+============================================================ */
+function advanceCycle(manual) {
+  state.cycles++;
+  state.cycleAcc   = 0;
+  state.cycleEpoch = state.running ? Date.now() : null;
+  manual ? playClick() : playBeep();
+  save();
+  // Animate ring reset
+  setRing(0);
+}
+
+/* ============================================================
+   PHASE TRANSITIONS
+============================================================ */
+function finishPhase1() {
+  // Auto-transition to Phase 2 after a short pause
+  pauseTimer();
+  state.accSeconds = PHASE1_DURATION;
+  setRing(1);
+  $timerDisplay.textContent = '00:00';
+  $progressFill.style.width = '100%';
+  $progressPct.textContent  = '100%';
+  playAlert();
+
+  setTimeout(() => switchToPhase(2), 1200);
+}
+
+function finishPhase2() {
+  state.running = false;
+  state.done    = true;
+  cancelAnimationFrame(rafId);
+  playAlert();
+
+  setRing(1);
+  $timerDisplay.textContent = '00:00';
+  $progressFill.style.width = '100%';
+  $progressPct.textContent  = '100%';
+
+  $controlBtns.classList.add('hidden');
+  $completion.classList.add('visible');
+  save();
+}
+
+/* ============================================================
+   SWITCH PHASE (manual top-bar button OR auto-transition)
+   Switches between Phase 1 and Phase 2, preserving progress
+   in whichever phase you return to.
+============================================================ */
+function switchToPhase(targetPhase) {
+  if (state.done) return;
+
+  // Snapshot current running time before switching
+  if (state.running) {
+    const now = Date.now();
+    state.accSeconds += (now - state.startEpoch) / 1000;
+    state.startEpoch = null;
+    if (state.phase === 2 && state.cycleEpoch !== null) {
+      state.cycleAcc  += (now - state.cycleEpoch) / 1000;
+      state.cycleEpoch = null;
+    }
+    state.running = false;
+  }
+
+  state.phase = targetPhase;
+
+  // If switching INTO phase 2 for the first time (no progress yet), reset it cleanly
+  // (If you switch back and forth, existing progress is preserved)
+
+  animateCardTransition();
+  applyPhaseTheme();
+  updateStartPauseBtn();
+  renderStaticSnapshot();
+  save();
+}
+
+function animateCardTransition() {
+  $card.classList.add('phase-transition');
+  setTimeout(() => $card.classList.remove('phase-transition'), 500);
+}
+
+/* ============================================================
+   RENDER STATIC SNAPSHOT  (used on init & after switch)
+============================================================ */
+function renderStaticSnapshot() {
+  if (state.phase === 1) {
+    const remaining = Math.max(0, PHASE1_DURATION - state.accSeconds);
+    $timerDisplay.textContent = fmt(remaining);
+    setRing(state.accSeconds / PHASE1_DURATION);
+    const pct = Math.min(100, (state.accSeconds / PHASE1_DURATION) * 100);
+    $progressFill.style.width = pct + '%';
+    $progressPct.textContent  = Math.round(pct) + '%';
+  } else {
+    const totalEl    = state.accSeconds;
+    const cEl        = state.cycleAcc;
+    const cRem       = Math.max(0, CYCLE_DURATION - cEl);
+    $timerDisplay.textContent = fmt(cRem);
+    setRing(cEl / CYCLE_DURATION);
+    const pct = Math.min(100, (totalEl / PHASE2_DURATION) * 100);
+    $progressFill.style.width = pct + '%';
+    $progressPct.textContent  = Math.round(pct) + '%';
+    const qNum = state.cycles + 1;
+    $statQuestion.textContent = `Q ${qNum}`;
+    $statElapsed.textContent  = fmt(totalEl);
+    $statCycles.textContent   = state.cycles;
+    $statTotal.textContent    = fmt(Math.max(0, PHASE2_DURATION - totalEl));
+  }
+}
+
+/* ============================================================
+   START / PAUSE
+============================================================ */
+function startPause() {
+  if (state.done) return;
+  ensureAudio();
+
+  if (state.running) {
+    pauseTimer();
+  } else {
+    resumeTimer();
+  }
+
+  updateStartPauseBtn();
+  save();
+}
+
+function pauseTimer() {
+  if (!state.running) return;
+  state.running = false;
+  cancelAnimationFrame(rafId);
+  const now = Date.now();
+  if (state.startEpoch !== null) {
+    state.accSeconds += (now - state.startEpoch) / 1000;
+    state.startEpoch  = null;
+  }
+  if (state.phase === 2 && state.cycleEpoch !== null) {
+    state.cycleAcc  += (now - state.cycleEpoch) / 1000;
+    state.cycleEpoch = null;
+  }
+}
+
+function resumeTimer() {
+  state.running    = true;
+  state.startEpoch = Date.now();
+  if (state.phase === 2) state.cycleEpoch = Date.now();
+  startLoop();
+}
+
+function updateStartPauseBtn() {
+  if (state.done) {
+    $startPauseBtn.textContent = '✔ Done';
+    $startPauseBtn.disabled    = true;
+    return;
+  }
+  $startPauseBtn.disabled    = false;
+  $startPauseBtn.textContent = state.running ? '⏸ Pause' : '▶ Resume';
+  // Show "Start" only at very beginning of Phase 1
+  if (state.phase === 1 && !state.running && state.accSeconds === 0) {
+    $startPauseBtn.textContent = '▶ Start';
+  }
+  if (state.phase === 2 && !state.running && state.accSeconds === 0 && state.cycles === 0 && state.cycleAcc === 0) {
+    $startPauseBtn.textContent = '▶ Start';
+  }
+}
+
+/* ============================================================
+   RESET CURRENT PHASE
+============================================================ */
+function resetPhase() {
+  pauseTimer();
+  state.accSeconds = 0;
+  state.startEpoch = null;
+  if (state.phase === 2) {
+    state.cycleAcc   = 0;
+    state.cycleEpoch = null;
+    state.cycles     = 0;
+  }
+  $timerDisplay.classList.remove('urgent');
+  renderStaticSnapshot();
+  updateStartPauseBtn();
+  save();
+}
+
+/* ============================================================
+   RESTART FULL EXAM
+============================================================ */
+function restartFull() {
+  cancelAnimationFrame(rafId);
+  state = {
+    phase:       1,
+    running:     false,
+    soundOn:     state.soundOn,
+    darkMode:    state.darkMode,
+    startEpoch:  null,
+    accSeconds:  0,
+    cycles:      0,
+    cycleEpoch:  null,
+    cycleAcc:    0,
+    done:        false,
+  };
+  $completion.classList.remove('visible');
+  $controlBtns.classList.remove('hidden');
+  $timerDisplay.classList.remove('urgent');
+  animateCardTransition();
+  applyPhaseTheme();
+  renderStaticSnapshot();
+  updateStartPauseBtn();
+  save();
+}
+
+/* ============================================================
+   RAF LOOP
+============================================================ */
+function startLoop() {
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(tick);
+}
+
+function tick() {
+  if (!state.running) return;
+  updateUI();
+  rafId = requestAnimationFrame(tick);
+}
+
+/* ============================================================
+   THEME & SOUND
+============================================================ */
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
+  $themeToggle.textContent = state.darkMode ? '☀️' : '🌙';
+}
+
+function applySound() {
+  $soundToggle.textContent = state.soundOn ? '🔔' : '🔕';
+}
+
+/* ============================================================
+   LOCALSTORAGE
+============================================================ */
+function save() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      phase:      state.phase,
+      soundOn:    state.soundOn,
+      darkMode:   state.darkMode,
+      accSeconds: state.accSeconds,
+      cycles:     state.cycles,
+      cycleAcc:   state.cycleAcc,
+      done:       state.done,
+    }));
+  } catch(e) {}
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    state.phase      = s.phase      ?? 1;
+    state.soundOn    = s.soundOn    ?? true;
+    state.darkMode   = s.darkMode   ?? false;
+    state.accSeconds = s.accSeconds ?? 0;
+    state.cycles     = s.cycles     ?? 0;
+    state.cycleAcc   = s.cycleAcc   ?? 0;
+    state.done       = s.done       ?? false;
+    // Clamp to prevent overflow
+    const max = state.phase === 1 ? PHASE1_DURATION : PHASE2_DURATION;
+    if (state.accSeconds > max) state.accSeconds = max;
+    if (state.cycleAcc > CYCLE_DURATION) state.cycleAcc = 0;
+  } catch(e) {}
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+function init() {
+  load();
+  applyPhaseTheme();
+  applyTheme();
+  applySound();
+  updateStartPauseBtn();
+
+  if (state.done) {
+    $controlBtns.classList.add('hidden');
+    $completion.classList.add('visible');
+    setRing(1);
+    $progressFill.style.width = '100%';
+    $progressPct.textContent  = '100%';
+    $timerDisplay.textContent = '00:00';
+    return;
+  }
+
+  renderStaticSnapshot();
+
+  /* ── Event Listeners ── */
+
+  // Start / Pause
+  $startPauseBtn.addEventListener('click', startPause);
+
+  // Reset current phase
+  $resetBtn.addEventListener('click', resetPhase);
+
+  // Restart full exam
+  $restartBtn.addEventListener('click', restartFull);
+
+  // Phase 1 "Done Early" → jump to Part B
+  $nextPhase1Btn.addEventListener('click', () => {
+    ensureAudio();
+    playClick();
+    switchToPhase(2);
+  });
+
+  // Phase 2 "Next Question" → skip remaining cycle seconds
+  $nextCycleBtn.addEventListener('click', () => {
+    if (!state.running && state.cycleAcc === 0 && state.cycles === 0) return; // not started
+    ensureAudio();
+    // Snapshot current cycle time before advancing
+    if (state.running && state.cycleEpoch !== null) {
+      state.cycleAcc  += (Date.now() - state.cycleEpoch) / 1000;
+      state.cycleEpoch = Date.now(); // reset cycle epoch
+    }
+    advanceCycle(true);
+    renderStaticSnapshot();
+  });
+
+  // Top-bar phase switch button
+  $phaseSwitchBtn.addEventListener('click', () => {
+    ensureAudio();
+    playClick();
+    switchToPhase(state.phase === 1 ? 2 : 1);
+  });
+
+  // Sound toggle
+  $soundToggle.addEventListener('click', () => {
+    ensureAudio();
+    state.soundOn = !state.soundOn;
+    applySound();
+    save();
+  });
+
+  // Dark mode toggle
+  $themeToggle.addEventListener('click', () => {
+    state.darkMode = !state.darkMode;
+    applyTheme();
+    save();
+  });
+
+  // Handle tab visibility change — resume RAF if needed
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && state.running) startLoop();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
